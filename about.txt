@@ -1,10 +1,9 @@
 MayDay-404: A Real-Time ATC Simulator
 Developed By:
-Team # 1 | BlackBox ATC
 Asmad Nadeem | 25F-0537
 Faisal Shahzad | 25F-0619
 Umar Saleem | 25F-0545
 Course: CL2001 Data Structures Lab
-Section: CS 3 E/F
+Section: CS 3 E
 Semester: Fall 2026
 Manage BitLand airspace, handle emergencies, locate missing flights, and survive 30 ticks.
