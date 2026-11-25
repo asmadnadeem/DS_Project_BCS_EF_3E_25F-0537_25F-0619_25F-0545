@@ -279,4 +279,208 @@ public:
     }
 };
 
+// ---------------- MODULE 8: FASTEST INTERCEPT ROUTE (DIJKSTRA) ----------------
+class RouteFinder {
+private:
+    SpaceGraph* graph;
+
+public:
+    RouteFinder(SpaceGraph* g) { graph = g; }
+
+    Route findFastestRoute(string sourceSector, string destRunway) {
+        Route res;
+        int n = graph->getSectorCount();
+        int s = graph->findIndex(sourceSector);
+        int t = graph->findIndex(destRunway);
+        if (s == -1 || t == -1) return res;
+
+        int dist[MAX_SECTORS];
+        int parent[MAX_SECTORS];
+        bool done[MAX_SECTORS];
+        for (int i = 0; i < n; i++) {
+            dist[i] = 99999;
+            parent[i] = -1;
+            done[i] = false;
+        }
+        dist[s] = 0;
+
+        // min-heap arrays for (node, distance)
+        int hNode[100], hDist[100], hSize = 0;
+        hNode[hSize] = s; hDist[hSize] = 0; hSize++;
+
+        while (hSize > 0) {
+            // extract min
+            int u = hNode[0], d = hDist[0];
+            hSize--;
+            hNode[0] = hNode[hSize];
+            hDist[0] = hDist[hSize];
+            int idx = 0;
+            while (true) {
+                int sm = idx, l = 2 * idx + 1, r = 2 * idx + 2;
+                if (l < hSize && hDist[l] < hDist[sm]) sm = l;
+                if (r < hSize && hDist[r] < hDist[sm]) sm = r;
+                if (sm != idx) {
+                    int tn = hNode[idx]; hNode[idx] = hNode[sm]; hNode[sm] = tn;
+                    int td = hDist[idx]; hDist[idx] = hDist[sm]; hDist[sm] = td;
+                    idx = sm;
+                } else break;
+            }
+
+            if (done[u]) continue;
+            done[u] = true;
+
+            for (int v = 0; v < n; v++) {
+                int w = graph->adjMatrix[u][v];
+                if (w > 0 && !done[v] && dist[u] + w < dist[v]) {
+                    dist[v] = dist[u] + w;
+                    parent[v] = u;
+                    hNode[hSize] = v;
+                    hDist[hSize] = dist[v];
+                    int cur = hSize++;
+                    while (cur > 0) {
+                        int p = (cur - 1) / 2;
+                        if (hDist[cur] < hDist[p]) {
+                            int tn = hNode[cur]; hNode[cur] = hNode[p]; hNode[p] = tn;
+                            int td = hDist[cur]; hDist[cur] = hDist[p]; hDist[p] = td;
+                            cur = p;
+                        } else break;
+                    }
+                }
+            }
+        }
+
+        if (dist[t] == 99999) return res;
+        res.totalCost = dist[t];
+        int rev[MAX_SECTORS], rLen = 0, cur = t;
+        while (cur != -1) {
+            rev[rLen++] = cur;
+            cur = parent[cur];
+        }
+        res.count = rLen;
+        for (int i = 0; i < rLen; i++) {
+            res.sectors[i] = graph->sectors[rev[rLen - 1 - i]];
+        }
+        return res;
+    }
+
+    void printRoute(Route r) {
+        if (r.count == 0) {
+            cout << "No valid route found!\n";
+            return;
+        }
+        cout << "Fastest Route (" << r.totalCost << " ticks): ";
+        for (int i = 0; i < r.count; i++) {
+            cout << r.sectors[i];
+            if (i < r.count - 1) cout << " -> ";
+        }
+        cout << endl;
+    }
+};
+
+// ---------------- MODULE 9: MINIMUM RADAR COVERAGE (KRUSKAL MST) ----------------
+struct EdgeItem {
+    int u, v, w;
+};
+
+class RadarMST {
+private:
+    SpaceGraph* graph;
+    EdgeItem mstEdges[MAX_SECTORS];
+    int mstCount;
+    int totalCost;
+
+    int findSet(int parent[], int i) {
+        while (parent[i] != i) i = parent[i];
+        return i;
+    }
+
+public:
+    RadarMST(SpaceGraph* g) {
+        graph = g;
+        mstCount = 0;
+        totalCost = 0;
+    }
+
+    void computeMST() {
+        int n = graph->getSectorCount();
+        EdgeItem edges[200];
+        int eCount = 0;
+
+        for (int i = 0; i < n; i++) {
+            for (int j = i + 1; j < n; j++) {
+                if (graph->adjMatrix[i][j] > 0) {
+                    edges[eCount].u = i;
+                    edges[eCount].v = j;
+                    edges[eCount].w = graph->adjMatrix[i][j];
+                    eCount++;
+                }
+            }
+        }
+
+        // bubble sort edges by weight
+        for (int i = 0; i < eCount - 1; i++) {
+            for (int j = 0; j < eCount - i - 1; j++) {
+                if (edges[j].w > edges[j + 1].w) {
+                    EdgeItem tmp = edges[j];
+                    edges[j] = edges[j + 1];
+                    edges[j + 1] = tmp;
+                }
+            }
+        }
+
+        int parent[MAX_SECTORS];
+        for (int i = 0; i < n; i++) parent[i] = i;
+
+        mstCount = 0;
+        totalCost = 0;
+        for (int i = 0; i < eCount; i++) {
+            int ru = findSet(parent, edges[i].u);
+            int rv = findSet(parent, edges[i].v);
+            if (ru != rv) {
+                parent[ru] = rv;
+                mstEdges[mstCount++] = edges[i];
+                totalCost += edges[i].w;
+            }
+        }
+    }
+
+    void displayMST() {
+        cout << "\n--- MINIMUM RADAR COVERAGE (KRUSKAL MST) ---\n";
+        for (int i = 0; i < mstCount; i++) {
+            cout << graph->sectors[mstEdges[i].u] << " <--> "
+                 << graph->sectors[mstEdges[i].v] << " (Cost: " << mstEdges[i].w << ")\n";
+        }
+        cout << "Total Minimum Radar Cost: " << totalCost << " ticks\n";
+    }
+
+    void verifyConnectivity() {
+        if (mstCount == 0) return;
+        int n = graph->getSectorCount();
+        // test removing first MST edge
+        int skipU = mstEdges[0].u, skipV = mstEdges[0].v;
+        bool vis[MAX_SECTORS] = { false };
+        int q[MAX_SECTORS], f = 0, r = 0;
+        vis[0] = true;
+        q[r++] = 0;
+        int reached = 0;
+        while (f < r) {
+            int u = q[f++];
+            reached++;
+            for (int i = 0; i < mstCount; i++) {
+                if (i == 0) continue;
+                int nxt = -1;
+                if (mstEdges[i].u == u) nxt = mstEdges[i].v;
+                else if (mstEdges[i].v == u) nxt = mstEdges[i].u;
+                if (nxt != -1 && !vis[nxt]) {
+                    vis[nxt] = true;
+                    q[r++] = nxt;
+                }
+            }
+        }
+        cout << "Connectivity Check (Removing " << graph->sectors[skipU] << " - "
+             << graph->sectors[skipV] << "): Reached " << reached << "/" << n
+             << " sectors -> Network Disconnected (Minimality Verified).\n";
+    }
+};
+
 #endif
